@@ -1,7 +1,7 @@
 {
   "name": "classicmail",
   "productName": "ClassicMail",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "An Outlook Classic-style desktop mail and calendar client for Ubuntu (IMAP/SMTP + ICS calendars).",
   "author": "Varshith",
   "license": "MIT",

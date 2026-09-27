@@ -314,6 +314,17 @@ test('unified inbox merges accounts, keeps going when one account fails', async 
   await mail.disposeAccount(broken.id);
 });
 
+test('markFolderRead: clears every unseen message in a folder without touching the message count', async () => {
+  const before = await mail.folderCounts(acc.id);
+  assert.ok(before.INBOX.unseen > 0, 'expected some unseen mail before marking read');
+  await mail.markFolderRead(acc.id, 'INBOX');
+  const after = await mail.folderCounts(acc.id);
+  assert.equal(after.INBOX.unseen, 0);
+  assert.equal(after.INBOX.messages, before.INBOX.messages, 'message count must not change');
+  const unread = await mail.listMessages(acc.id, 'INBOX', { filter: 'unread' });
+  assert.equal(unread.rows.length, 0);
+});
+
 test('helpers: List-Unsubscribe parsing and attachment detection', () => {
   assert.deepEqual(parseListUnsubscribe('<https://example.com/u?x=1>, <mailto:unsub@example.com>'), { http: 'https://example.com/u?x=1', mailto: 'mailto:unsub@example.com' });
   assert.equal(parseListUnsubscribe('javascript:alert(1)'), null);

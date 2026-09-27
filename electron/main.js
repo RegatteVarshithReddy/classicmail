@@ -308,6 +308,7 @@ function registerIpc() {
   handle('folders.create', (_e, accountId, folder) => mail.createFolder(accountId, folder));
   handle('folders.rename', (_e, accountId, folder, next) => mail.renameFolder(accountId, folder, next));
   handle('folders.delete', (_e, accountId, folder) => mail.deleteFolder(accountId, folder));
+  handle('folders.markRead', (_e, accountId, folder) => mail.markFolderRead(accountId, folder));
 
   // messages
   handle('messages.list', (_e, accountId, folder, opts) => mail.listMessages(accountId, folder, opts || {}));

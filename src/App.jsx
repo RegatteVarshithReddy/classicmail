@@ -461,12 +461,17 @@ export default function App() {
   }, [openDraft, settings.readingPane]);
 
   const onRowMenu = useCallback((e, row) => {
+    const x = e.clientX, y = e.clientY;
     const rows = selected.includes(row.key) ? selRows : [row];
     if (!selected.includes(row.key)) { setSelected([row.key]); anchorKey.current = row.key; }
     const one = rows.length === 1;
     const allRead = rows.every(r => r.seen);
     const allFlag = rows.every(r => r.flagged);
-    setMenu({ x: e.clientX, y: e.clientY, items: [
+    const rowTargets = (folders[rows[0].accountId] || []).filter(f => f.selectable && f.path !== rows[0].path).map(f => ({ path: f.path, label: f.displayName }));
+    const openMoveSubmenu = () => setMenu({ x, y, items: rowTargets.length
+      ? rowTargets.map(t => ({ label: t.label, icon: 'folder', onClick: () => moveRows(rows, rows[0].accountId, t.path) }))
+      : [{ label: 'No other folders', disabled: true }] });
+    setMenu({ x, y, items: [
       { label: 'Reply', icon: 'reply', disabled: !one, onClick: () => reply(false) },
       { label: 'Reply All', icon: 'reply-all', disabled: !one, onClick: () => reply(true) },
       { label: 'Forward', icon: 'forward', disabled: !one, onClick: forward },
@@ -474,26 +479,38 @@ export default function App() {
       { label: allRead ? 'Mark as Unread' : 'Mark as Read', icon: allRead ? 'mail' : 'mail-open', onClick: () => markRead(rows, !allRead) },
       { label: allFlag ? 'Clear Flag' : 'Flag', icon: 'flag', onClick: () => setFlagged(rows, !allFlag) },
       { separator: true },
+      { label: 'Move to…', icon: 'move', onClick: openMoveSubmenu },
       { label: 'Archive', icon: 'archive', onClick: () => archive(rows) },
       { label: 'Junk', icon: 'junk', onClick: () => junk(rows) },
       { label: 'Delete', icon: 'delete', danger: true, onClick: () => del(rows) }
     ] });
-  }, [selected, selRows, reply, forward, markRead, setFlagged, archive, junk, del]);
+  }, [selected, selRows, folders, reply, forward, markRead, setFlagged, moveRows, archive, junk, del]);
 
   // ---- folder management ---------------------------------------------------------------------
   const onFolderMenu = useCallback((e, account, folder) => {
     const special = Boolean(folder.specialUse);
+    const unseen = (counts[account.id] && counts[account.id][folder.path] && counts[account.id][folder.path].unseen) || 0;
     const reloadFolders = async () => { setFolders(f => { const n = { ...f }; delete n[account.id]; return n; }); };
     setMenu({ x: e.clientX, y: e.clientY, items: [
       { label: 'New Subfolder…', icon: 'plus', onClick: () => setDialog({ type: 'prompt', title: 'New folder', label: 'Folder name', confirmLabel: 'Create',
         onSubmit: async (name) => { setDialog(null); try { await call('folders.create', account.id, folder.path ? `${folder.path}${folder.delimiter || '/'}${name}` : name); await reloadFolders(); } catch (err) { fail(err); } } }) },
       { label: 'Rename…', icon: 'drafts', disabled: special, onClick: () => setDialog({ type: 'prompt', title: 'Rename folder', label: 'New name', initial: folder.name, confirmLabel: 'Rename',
         onSubmit: async (name) => { setDialog(null); try { const parent = folder.parentPath ? `${folder.parentPath}${folder.delimiter || '/'}` : ''; await call('folders.rename', account.id, folder.path, `${parent}${name}`); await reloadFolders(); if (sel.kind === 'folder' && sel.path === folder.path) selectFolder({ kind: 'unified' }); } catch (err) { fail(err); } } }) },
+      { separator: true },
+      { label: 'Mark All as Read', icon: 'mail-open', disabled: unseen === 0, onClick: async () => {
+        try {
+          await call('folders.markRead', account.id, folder.path);
+          patchRows(new Set(list.rows.filter(r => r.accountId === account.id && r.path === folder.path).map(r => r.key)), { seen: true });
+          refreshCounts(account.id);
+          reload();
+        } catch (err) { fail(err); }
+      } },
+      { separator: true },
       { label: 'Delete Folder…', icon: 'delete', danger: true, disabled: special, onClick: () => setDialog({ type: 'confirm', title: 'Delete folder', danger: true, confirmLabel: 'Delete',
         message: `Delete the folder “${folder.name}”? Messages inside it will be deleted with it.`,
         onConfirm: async () => { setDialog(null); try { await call('folders.delete', account.id, folder.path); await reloadFolders(); if (sel.kind === 'folder' && sel.path === folder.path) selectFolder({ kind: 'unified' }); } catch (err) { fail(err); } } }) }
     ] });
-  }, [fail, sel, selectFolder]);
+  }, [fail, sel, selectFolder, counts, list.rows, patchRows, refreshCounts, reload]);
 
   // ---- derived ribbon/context info ----------------------------------------------------------------
   const moveTargets = useMemo(() => {
@@ -606,7 +623,7 @@ export default function App() {
         )}
       </div>
       <footer className="statusbar">
-        <span>{view === 'mail' ? `Items: ${list.total}   Unread: ${sel.kind === 'unread' ? list.total : unreadInList}${list.hasMore ? '+' : ''}` : `${calEvents.length} events shown`}</span>
+        <span>{view === 'mail' ? `Items: ${list.total}   Unread: ${sel.kind === 'unread' ? list.total : unreadInList}${list.hasMore ? '+' : ''}${ribbonSel.count > 0 ? `   Selected: ${ribbonSel.count}` : ''}` : `${calEvents.length} events shown`}</span>
         <span className="status-mid">{statusMiddle}</span>
         <span>{isDemo() ? 'Demo data' : `${enabledAccounts.length} account${enabledAccounts.length === 1 ? '' : 's'}`}</span>
       </footer>

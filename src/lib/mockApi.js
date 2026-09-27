@@ -173,6 +173,7 @@ const handlers = {
   'folders.create': (id, path) => { folders[id].push({ path, name: path.split('/').pop(), delimiter: '/', parentPath: path.includes('/') ? path.split('/').slice(0, -1).join('/') : '', specialUse: '', selectable: true, displayName: path.split('/').pop(), order: 100, subscribed: true }); store[id][path] = []; return { path }; },
   'folders.rename': () => ({}),
   'folders.delete': () => ({}),
+  'folders.markRead': (id, path) => { for (const m of store[id][path] || []) m.row.seen = true; return true; },
   'messages.list': (id, path, opts) => page((store[id][path] || []).map(m => m.row), opts),
   'messages.unified': (opts = {}) => { const rows = accounts.filter(a => a.enabled).flatMap(a => (store[a.id].INBOX || []).map(m => m.row)); return { ...page(rows, opts), errors: [] }; },
   'messages.get': (id, path, uid) => {

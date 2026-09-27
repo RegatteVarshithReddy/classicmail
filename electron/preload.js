@@ -7,7 +7,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 const REQUESTS = new Set([
   'accounts.list', 'accounts.presets', 'accounts.save', 'accounts.remove', 'accounts.test',
-  'folders.list', 'folders.counts', 'folders.create', 'folders.rename', 'folders.delete',
+  'folders.list', 'folders.counts', 'folders.create', 'folders.rename', 'folders.delete', 'folders.markRead',
   'messages.list', 'messages.unified', 'messages.get', 'messages.saveAttachment',
   'messages.setFlags', 'messages.move', 'messages.trash', 'messages.archive', 'messages.junk',
   'mail.send', 'mail.saveDraft', 'mail.deleteDraft',

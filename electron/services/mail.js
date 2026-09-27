@@ -561,6 +561,19 @@ class MailService extends EventEmitter {
     });
   }
 
+  /** Marks every unread message in the folder as read, without fetching each UID first. */
+  async markFolderRead(accountId, path) {
+    return this._withClient(accountId, async (client) => {
+      const lock = await client.getMailboxLock(path);
+      try {
+        await client.messageFlagsAdd({ seen: false }, ['\\Seen'], { uid: true });
+        return true;
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
   async moveMessages(accountId, path, uids, destination) {
     if (path === destination) return { moved: 0 };
     const range = uidList(uids);
