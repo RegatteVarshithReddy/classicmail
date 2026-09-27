@@ -28,6 +28,7 @@
     "dompurify": "^3.4.16",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
+    "playwright": "^1.63.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "smtp-server": "^3.19.13",

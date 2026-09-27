@@ -257,6 +257,52 @@ const shot = async (page, name) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursiv
     await shot(page, 'restart');
   });
 
+  await step('Ctrl+click multi-selects rows and the status bar shows a selection count', async () => {
+    const rows = page.locator('.msg-row');
+    assert.ok(await rows.count() >= 2, 'need at least two messages left to multi-select');
+    await rows.nth(0).click();
+    await rows.nth(1).click({ modifiers: ['Control'] });
+    await page.waitForFunction(() => document.querySelectorAll('.msg-row.selected').length === 2);
+    assert.match(await page.locator('.statusbar').textContent(), /Selected:\s*2/);
+    await shot(page, 'multi-select');
+    await rows.nth(0).click(); // back to a single selection for the next steps
+  });
+
+  await step('right-click "Move to..." on a message moves it via the context menu', async () => {
+    const before = await page.locator('.msg-row').count();
+    await page.locator('.msg-row').first().click();
+    await page.locator('.msg-row').first().click({ button: 'right' });
+    await page.waitForSelector('.menu-item:has-text("Move to")');
+    await page.locator('.menu-item', { hasText: 'Move to' }).click();
+    await page.waitForSelector('.menu-item:has-text("Deleted Items")');
+    await page.locator('.menu-item', { hasText: 'Deleted Items' }).click();
+    await page.waitForFunction(n => document.querySelectorAll('.msg-row').length === n, before - 1);
+    await page.locator('.tree-row', { hasText: 'Deleted Items' }).click();
+    await page.waitForSelector('.msg-row');
+    assert.ok(await page.locator('.msg-row').count() >= 1, 'the moved message landed in Deleted Items');
+    await page.locator('.tree-row', { hasText: 'Inbox' }).nth(1).click();
+    await page.waitForSelector('.msg-row');
+  });
+
+  await step('folder right-click "Mark All as Read" clears every unread message in that folder', async () => {
+    await page.locator('.msg-row').first().click();
+    await page.keyboard.press('Control+U'); // deterministically force at least one message unread first
+    await page.waitForSelector('.msg-row.unread');
+    await page.locator('.tree-row', { hasText: 'Inbox' }).nth(1).click({ button: 'right' });
+    await page.waitForSelector('.menu-item:has-text("Mark All as Read")');
+    await page.locator('.menu-item', { hasText: 'Mark All as Read' }).click();
+    await page.waitForFunction(() => !document.querySelector('.msg-row.unread'));
+    assert.equal(await page.locator('.msg-row.unread').count(), 0);
+    // Ask the server directly that it agrees the folder is fully read.
+    const { ImapFlow } = require('imapflow');
+    const c = new ImapFlow({ host: '127.0.0.1', port: imap.port, secure: false, auth: { user: 'demouser', pass: 'demopass' }, logger: false, disableAutoIdle: true });
+    await c.connect();
+    const inbox = await c.status('INBOX', { unseen: true });
+    await c.logout();
+    assert.equal(inbox.unseen, 0);
+    await shot(page, 'mark-all-read');
+  });
+
   await step('no unexpected errors reached the console', async () => { assert.deepEqual(problems, []); });
 
   await app.close();
