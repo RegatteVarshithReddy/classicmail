@@ -6,7 +6,7 @@ const { pathToFileURL } = require('url');
 const { Store, PRESETS } = require('./services/store');
 const { MailService } = require('./services/mail');
 const { CalendarService } = require('./services/calendar');
-const { AiService } = require('./services/ai');
+const { AiService, estimateCostUsd } = require('./services/ai');
 
 const DEV = process.env.CLASSICMAIL_DEV === '1';
 const DEV_URL = 'http://localhost:5173/';
@@ -369,12 +369,16 @@ function registerIpc() {
   handle('contacts.search', (_e, prefix) => store.searchContacts(prefix));
 
   // AI drafting (opt-in; off unless the user has enabled it and saved their own API key)
-  handle('ai.getConfig', () => store.getAiConfig());
-  handle('ai.setConfig', (_e, input) => store.setAiConfig(input || {}));
-  handle('ai.draft', (_e, input) => {
+  const withCost = (cfg) => ({ ...cfg, estimatedCostUsd: estimateCostUsd(cfg.usage) });
+  handle('ai.getConfig', () => withCost(store.getAiConfig()));
+  handle('ai.setConfig', (_e, input) => withCost(store.setAiConfig(input || {})));
+  handle('ai.resetUsage', () => withCost(store.resetAiUsage()));
+  handle('ai.draft', async (_e, input) => {
     const cfg = store.getAiConfig();
     if (!cfg.enabled || !cfg.hasKey) throw new Error('Turn on AI drafting and add an API key in Settings → AI first.');
-    return ai.draftReply(input || {});
+    const result = await ai.draftReply(input || {});
+    store.addAiUsage(result.usage);
+    return { text: result.text };
   });
 
   // app

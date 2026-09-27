@@ -75,24 +75,47 @@ test('settings: only known keys with the right type are accepted and clamped', (
   assert.equal('evil' in out, false);
 });
 
+const ZERO_USAGE = { drafts: 0, inputTokens: 0, outputTokens: 0 };
+
 test('AI config: key is encrypted at rest, blank keeps it, disabling needs no key', () => {
   const dir = tempDir();
   const s = new Store(dir, dummySecrets);
-  assert.deepEqual(s.getAiConfig(), { enabled: false, hasKey: false });
+  assert.deepEqual(s.getAiConfig(), { enabled: false, hasKey: false, usage: ZERO_USAGE });
   assert.throws(() => s.setAiConfig({ enabled: true, apiKey: '' }), /Enter an API key/);
 
   const cfg = s.setAiConfig({ enabled: true, apiKey: 'sk-ant-secret' });
-  assert.deepEqual(cfg, { enabled: true, hasKey: true });
+  assert.deepEqual(cfg, { enabled: true, hasKey: true, usage: ZERO_USAGE });
   assert.equal(s.getAiKey(), 'sk-ant-secret');
   const onDisk = fs.readFileSync(path.join(dir, 'ai.json'), 'utf8');
   assert.ok(!onDisk.includes('sk-ant-secret'), 'plaintext API key found on disk');
 
   s.setAiConfig({ enabled: false, apiKey: '' });
-  assert.deepEqual(s.getAiConfig(), { enabled: false, hasKey: true });
+  assert.deepEqual(s.getAiConfig(), { enabled: false, hasKey: true, usage: ZERO_USAGE });
   assert.equal(s.getAiKey(), 'sk-ant-secret', 'blank apiKey must keep the saved key');
 
   const s2 = new Store(dir, dummySecrets);
   assert.equal(s2.getAiKey(), 'sk-ant-secret');
+});
+
+test('AI usage: accumulates across drafts, survives an unrelated settings save, and resets', () => {
+  const dir = tempDir();
+  const s = new Store(dir, dummySecrets);
+  s.setAiConfig({ enabled: true, apiKey: 'sk-ant-secret' });
+
+  s.addAiUsage({ inputTokens: 100, outputTokens: 20 });
+  s.addAiUsage({ inputTokens: 50, outputTokens: 10 });
+  assert.deepEqual(s.getAiConfig().usage, { drafts: 2, inputTokens: 150, outputTokens: 30 });
+
+  // Saving settings again (e.g. re-typing the key) must not reset the running total.
+  s.setAiConfig({ enabled: true, apiKey: '' });
+  assert.deepEqual(s.getAiConfig().usage, { drafts: 2, inputTokens: 150, outputTokens: 30 });
+
+  const s2 = new Store(dir, dummySecrets);
+  assert.deepEqual(s2.getAiConfig().usage, { drafts: 2, inputTokens: 150, outputTokens: 30 });
+
+  const reset = s2.resetAiUsage();
+  assert.deepEqual(reset.usage, ZERO_USAGE);
+  assert.deepEqual(s2.getAiConfig().usage, ZERO_USAGE);
 });
 
 test('contacts: auto-complete ranks by frequency', () => {

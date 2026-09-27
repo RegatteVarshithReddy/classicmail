@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Store } = require('../electron/services/store');
-const { AiService, MAX_CONTEXT_CHARS } = require('../electron/services/ai');
+const { AiService, MAX_CONTEXT_CHARS, estimateCostUsd, PRICE_PER_MTOK_INPUT, PRICE_PER_MTOK_OUTPUT } = require('../electron/services/ai');
 const { tempDir, dummySecrets } = require('./helpers');
 
 function fakeResponse({ status = 200, body = {} } = {}) {
@@ -16,14 +16,15 @@ function setup(fetchImpl) {
   return { store, svc };
 }
 
-test('draftReply: sends the expected request and extracts the text', async () => {
+test('draftReply: sends the expected request, extracts the text, and reports token usage', async () => {
   let captured;
   const { svc } = setup(async (url, options) => {
     captured = { url, options };
-    return fakeResponse({ body: { content: [{ type: 'text', text: 'Thanks for reaching out.' }] } });
+    return fakeResponse({ body: { content: [{ type: 'text', text: 'Thanks for reaching out.' }], usage: { input_tokens: 120, output_tokens: 18 } } });
   });
   const result = await svc.draftReply({ subject: 'Hello', quotedText: 'Original message body', instruction: 'Say thanks', mode: 'reply' });
   assert.equal(result.text, 'Thanks for reaching out.');
+  assert.deepEqual(result.usage, { inputTokens: 120, outputTokens: 18 });
 
   assert.equal(captured.url, 'https://api.anthropic.com/v1/messages');
   assert.equal(captured.options.method, 'POST');
@@ -72,4 +73,18 @@ test('draftReply: refuses when no key has been saved', async () => {
   const store = new Store(tempDir(), dummySecrets);
   const svc = new AiService(store, { fetchImpl: async () => { throw new Error('no network expected'); } });
   await assert.rejects(() => svc.draftReply({ subject: '', quotedText: '', instruction: 'Reply', mode: 'reply' }), /No Claude API key/);
+});
+
+test('draftReply: missing usage in the response is treated as zero, not a crash', async () => {
+  const { svc } = setup(async () => fakeResponse({ body: { content: [{ text: 'ok' }] } }));
+  const result = await svc.draftReply({ subject: '', quotedText: '', instruction: 'Reply', mode: 'reply' });
+  assert.deepEqual(result.usage, { inputTokens: 0, outputTokens: 0 });
+});
+
+test('estimateCostUsd: matches Claude Haiku 4.5 list pricing', () => {
+  assert.equal(estimateCostUsd({ inputTokens: 1_000_000, outputTokens: 0 }), PRICE_PER_MTOK_INPUT);
+  assert.equal(estimateCostUsd({ inputTokens: 0, outputTokens: 1_000_000 }), PRICE_PER_MTOK_OUTPUT);
+  assert.equal(estimateCostUsd({ inputTokens: 500_000, outputTokens: 100_000 }), PRICE_PER_MTOK_INPUT * 0.5 + PRICE_PER_MTOK_OUTPUT * 0.1);
+  assert.equal(estimateCostUsd(), 0);
+  assert.equal(estimateCostUsd({}), 0);
 });

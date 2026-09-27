@@ -224,8 +224,9 @@ function CalendarsTab({ calendars, onChanged }) {
   );
 }
 
+const row = (label, control) => (<><label className="field-label">{label}</label><div>{control}</div></>);
+
 function GeneralTab({ settings, onChange, info }) {
-  const row = (label, control) => (<><label className="field-label">{label}</label><div>{control}</div></>);
   return (
     <div>
       <div className="section-head"><h3>Reading</h3></div>
@@ -254,33 +255,45 @@ function GeneralTab({ settings, onChange, info }) {
   );
 }
 
+const ZERO_USAGE = { drafts: 0, inputTokens: 0, outputTokens: 0 };
+
+function formatCost(n) {
+  return n > 0 && n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`;
+}
+
 function AiTab() {
   const [enabled, setEnabled] = useState(false);
   const [hasKey, setHasKey] = useState(false);
   const [apiKey, setApiKey] = useState('');
+  const [usage, setUsage] = useState(ZERO_USAGE);
+  const [estimatedCostUsd, setEstimatedCostUsd] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
 
+  const applyCfg = (cfg) => {
+    setEnabled(cfg.enabled); setHasKey(cfg.hasKey);
+    setUsage(cfg.usage || ZERO_USAGE); setEstimatedCostUsd(cfg.estimatedCostUsd || 0);
+  };
+
   useEffect(() => {
     (async () => {
-      try {
-        const cfg = await call('ai.getConfig');
-        setEnabled(cfg.enabled); setHasKey(cfg.hasKey);
-      } catch (e) { setError(e.message); }
+      try { applyCfg(await call('ai.getConfig')); } catch (e) { setError(e.message); }
       setLoaded(true);
     })();
   }, []);
 
   const save = async () => {
     setBusy(true); setError(''); setNote('');
-    try {
-      const cfg = await call('ai.setConfig', { enabled, apiKey });
-      setEnabled(cfg.enabled); setHasKey(cfg.hasKey); setApiKey('');
-      setNote('Saved.');
-    } catch (e) { setError(e.message); }
+    try { applyCfg(await call('ai.setConfig', { enabled, apiKey })); setApiKey(''); setNote('Saved.'); }
+    catch (e) { setError(e.message); }
     setBusy(false);
+  };
+
+  const resetUsage = async () => {
+    setError('');
+    try { applyCfg(await call('ai.resetUsage')); } catch (e) { setError(e.message); }
   };
 
   if (!loaded) return null;
@@ -302,6 +315,20 @@ function AiTab() {
       <div className="form-actions">
         <button className="btn primary" onClick={save} disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
         {note && <span className="muted">{note}</span>}
+      </div>
+
+      <div className="section-head"><h3>Running cost estimate</h3></div>
+      <div className="form-grid">
+        {row('Drafts so far', <span>{usage.drafts.toLocaleString()}</span>)}
+        {row('Tokens used', <span>{usage.inputTokens.toLocaleString()} in / {usage.outputTokens.toLocaleString()} out</span>)}
+        {row('Estimated cost', <b>{formatCost(estimatedCostUsd)}</b>)}
+      </div>
+      <div className="hint">
+        <Icon name="info" size={15} />
+        <span>Based on Claude Haiku 4.5 list pricing ($1 / $5 per million input/output tokens). This is a local running total, not your real bill — check <b>console.anthropic.com</b> for actual usage.</span>
+      </div>
+      <div className="form-actions">
+        <button className="btn" onClick={resetUsage} disabled={usage.drafts === 0}>Reset counter</button>
       </div>
     </div>
   );

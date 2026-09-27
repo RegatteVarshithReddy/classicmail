@@ -31,15 +31,15 @@ Built with Electron 44 and React 19. Not affiliated with Microsoft; it uses no M
 ### From the .deb (recommended)
 
 ```bash
-sudo apt install ./classicmail_0.2.0_amd64.deb
+sudo apt install ./classicmail_0.2.1_amd64.deb
 classicmail          # or find "ClassicMail" in your app launcher
 ```
 
 ### From the AppImage
 
 ```bash
-chmod +x ClassicMail-0.2.0.AppImage
-./ClassicMail-0.2.0.AppImage
+chmod +x ClassicMail-0.2.1.AppImage
+./ClassicMail-0.2.1.AppImage
 ```
 On Ubuntu 24.04 the AppImage may need `--no-sandbox` because AppArmor blocks unprivileged user namespaces for unpackaged apps. The .deb installs an AppArmor profile and does not have this problem.
 

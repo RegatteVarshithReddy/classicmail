@@ -205,8 +205,9 @@ const handlers = {
   'settings.set': (patch) => { settings = { ...settings, ...patch }; return settings; },
   'contacts.search': (q) => [{ name: 'Priya Nair', address: 'priya.nair@example.net' }, { name: 'Jordan Lee', address: 'jordan.lee@example.org' }, { name: 'Sam Okafor', address: 'sam.okafor@example.net' }, { name: 'Dana Whitfield', address: 'ceo@northwind.example' }]
     .filter(c => `${c.name} ${c.address}`.toLowerCase().includes(String(q).toLowerCase())),
-  'ai.getConfig': () => ({ enabled: false, hasKey: false }),
+  'ai.getConfig': () => ({ enabled: false, hasKey: false, usage: { drafts: 0, inputTokens: 0, outputTokens: 0 }, estimatedCostUsd: 0 }),
   'ai.setConfig': () => { throw new Error('Not available in the demo.'); },
+  'ai.resetUsage': () => { throw new Error('Not available in the demo.'); },
   'ai.draft': () => { throw new Error('Not available in the demo.'); },
   'app.info': () => ({ version: '0.1.0', electron: 'demo', platform: 'linux', keyring: 'ok', dataDir: '~/.config/ClassicMail/data' }),
   'app.openExternal': (url) => { window.open(url, '_blank', 'noopener'); return true; },

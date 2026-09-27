@@ -6,6 +6,14 @@
 const MODEL = 'claude-haiku-4-5-20251001';
 const MAX_CONTEXT_CHARS = 6000;
 const MAX_TOKENS = 700;
+// Claude Haiku 4.5 list pricing, USD per 1M tokens (api.anthropic.com list price, checked against the
+// Anthropic pricing reference). Update these if the model or its pricing changes.
+const PRICE_PER_MTOK_INPUT = 1.0;
+const PRICE_PER_MTOK_OUTPUT = 5.0;
+
+function estimateCostUsd({ inputTokens = 0, outputTokens = 0 } = {}) {
+  return (inputTokens / 1e6) * PRICE_PER_MTOK_INPUT + (outputTokens / 1e6) * PRICE_PER_MTOK_OUTPUT;
+}
 
 function defaultInstruction(mode) {
   if (mode === 'forward') return 'Write a brief, friendly note introducing the forwarded message below.';
@@ -53,8 +61,12 @@ class AiService {
     const data = await res.json();
     const text = (data.content || []).map(b => b.text || '').join('').trim();
     if (!text) throw new Error('Claude returned an empty draft.');
-    return { text };
+    const usage = {
+      inputTokens: (data.usage && data.usage.input_tokens) || 0,
+      outputTokens: (data.usage && data.usage.output_tokens) || 0
+    };
+    return { text, usage };
   }
 }
 
-module.exports = { AiService, MODEL, MAX_CONTEXT_CHARS };
+module.exports = { AiService, MODEL, MAX_CONTEXT_CHARS, PRICE_PER_MTOK_INPUT, PRICE_PER_MTOK_OUTPUT, estimateCostUsd };

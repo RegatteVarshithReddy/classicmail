@@ -116,7 +116,7 @@ class Store {
     this._calendars = readJson(this.files.calendars, []);
     this._settings = Object.assign({}, DEFAULT_SETTINGS, readJson(this.files.settings, {}));
     this._contacts = readJson(this.files.contacts, {});
-    this._ai = Object.assign({ enabled: false, apiKeyEnc: '' }, readJson(this.files.ai, {}));
+    this._ai = Object.assign({ enabled: false, apiKeyEnc: '', usage: { drafts: 0, inputTokens: 0, outputTokens: 0 } }, readJson(this.files.ai, {}));
   }
 
   // ---- accounts -------------------------------------------------------
@@ -255,12 +255,12 @@ class Store {
 
   // ---- AI drafting (opt-in; key encrypted the same way as account passwords) --
   getAiConfig() {
-    return { enabled: this._ai.enabled, hasKey: Boolean(this._ai.apiKeyEnc) };
+    return { enabled: this._ai.enabled, hasKey: Boolean(this._ai.apiKeyEnc), usage: { ...this._ai.usage } };
   }
 
   /** `apiKey` is optional: blank keeps the previously saved key, same as account passwords. */
   setAiConfig({ enabled, apiKey }) {
-    const next = { enabled: Boolean(enabled), apiKeyEnc: this._ai.apiKeyEnc };
+    const next = { enabled: Boolean(enabled), apiKeyEnc: this._ai.apiKeyEnc, usage: this._ai.usage };
     if (apiKey) next.apiKeyEnc = this.secrets.encrypt(String(apiKey));
     if (next.enabled && !next.apiKeyEnc) throw new ValidationError('Enter an API key to enable AI drafting.');
     this._ai = next;
@@ -272,6 +272,22 @@ class Store {
   getAiKey() {
     if (!this._ai.apiKeyEnc) throw new Error('No Claude API key saved.');
     return this.secrets.decrypt(this._ai.apiKeyEnc);
+  }
+
+  /** Local running total for the cost-estimate display; not a substitute for the real bill. */
+  addAiUsage({ inputTokens = 0, outputTokens = 0 } = {}) {
+    this._ai.usage = {
+      drafts: this._ai.usage.drafts + 1,
+      inputTokens: this._ai.usage.inputTokens + inputTokens,
+      outputTokens: this._ai.usage.outputTokens + outputTokens
+    };
+    atomicWrite(this.files.ai, JSON.stringify(this._ai, null, 2));
+  }
+
+  resetAiUsage() {
+    this._ai.usage = { drafts: 0, inputTokens: 0, outputTokens: 0 };
+    atomicWrite(this.files.ai, JSON.stringify(this._ai, null, 2));
+    return this.getAiConfig();
   }
 
   // ---- contact cache (for address auto-complete) ------------------------

@@ -14,7 +14,7 @@ const REQUESTS = new Set([
   'calendars.list', 'calendars.save', 'calendars.remove', 'calendars.check', 'calendars.events', 'calendars.pickFile',
   'settings.get', 'settings.set',
   'contacts.search',
-  'ai.getConfig', 'ai.setConfig', 'ai.draft',
+  'ai.getConfig', 'ai.setConfig', 'ai.draft', 'ai.resetUsage',
   'app.info', 'app.openExternal', 'app.checkNow',
   'compose.open', 'compose.init', 'compose.close'
 ]);
